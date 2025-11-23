@@ -26,17 +26,7 @@ git clone https://github.com/chemica1/req_analyzer.git
 cd req_analyzer
 ```
 
-### 2. Download PyTorch (Required - Not in Repo)
-PyTorch is too large for GitHub. Download it separately:
-```bash
-# On a machine with internet:
-pip download torch --platform manylinux2014_x86_64 --python-version 3.10 --only-binary=:all: --dest packages
-
-# Or download directly:
-wget https://download.pytorch.org/whl/cpu/torch-2.4.1%2Bcpu-cp310-cp310-linux_x86_64.whl -P packages
-```
-
-### 3. Build or Run
+### 2. Build or Run
 
 #### Option A: Build Executable
 ```bash
