@@ -7,7 +7,6 @@ __pycache__/
 # Ignore build artifacts
 build/
 dist/
-*.spec
 
 # Do NOT ignore these for offline build
 !packages/

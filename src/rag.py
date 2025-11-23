@@ -10,7 +10,7 @@ import yaml
 # Constants
 CHROMA_PATH = "chroma_db"
 DEFAULT_MODEL_NAME = "all-MiniLM-L6-v2"
-DEFAULT_OLLAMA_MODEL = "llama3.1"
+DEFAULT_CHAT_MODEL = "llama3.2:3b"
 
 def load_config():
     # Look for config.yaml in the same directory as the executable
@@ -22,7 +22,7 @@ def load_config():
     config_path = os.path.join(base_path, "config.yaml")
     
     config = {
-        "ollama_model": DEFAULT_OLLAMA_MODEL,
+        "chat_model": DEFAULT_CHAT_MODEL,
         "embedding_model": DEFAULT_MODEL_NAME
     }
     
@@ -39,7 +39,7 @@ def load_config():
 
 config = load_config()
 MODEL_NAME = config["embedding_model"]
-OLLAMA_MODEL = config["ollama_model"]
+CHAT_MODEL = config["chat_model"]
 
 def get_resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """
@@ -61,13 +61,21 @@ def get_embedding_function():
         cache_folder=model_path
     )
 
-def query_rag(query_text: str, ollama_model: str = OLLAMA_MODEL):
+def query_rag(query_text: str, ollama_model: str = CHAT_MODEL):
     embedding_function = get_embedding_function()
     db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embedding_function)
 
     # Search the DB.
     results = db.similarity_search_with_score(query_text, k=5)
 
+    # Check if we have any results
+    if not results or len(results) == 0:
+        # No documents in database - use Ollama directly without RAG
+        print("Warning: No documents found in database. Using Ollama without context.")
+        model = ChatOllama(model=ollama_model)
+        response_text = model.invoke(query_text)
+        return response_text, ["No documents indexed yet. Please add PDFs to the data/ folder and click 'Re-index Documents'."], ""
+    
     context_text = "\n\n---\n\n".join([doc.page_content for doc, _score in results])
     
     prompt_template = ChatPromptTemplate.from_template(

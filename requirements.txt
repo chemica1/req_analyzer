@@ -95,6 +95,7 @@ Pygments==2.19.2
 pyinstaller==6.16.0
 pyinstaller-hooks-contrib==2025.10
 pypdf==6.3.0
+pdf2image==1.17.0
 
 pyproject_hooks==1.2.0
 python-dateutil==2.9.0.post0

@@ -1,2 +1,8 @@
-ollama_model: "llama3.1"
+# Model for analyzing PDF images (multimodal vision model)
+vision_model: "qwen3-vl:4b"
+
+# Model for chat responses (text-only model)
+chat_model: "llama3.2:3b"
+
+# Embedding model for vector search
 embedding_model: "all-MiniLM-L6-v2"

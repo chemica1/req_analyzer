@@ -13,6 +13,11 @@ if __name__ == "__main__":
     # When running as a PyInstaller binary, we need to point to the bundled ui.py
     # The src folder should be bundled.
     
+    # Add src directory to Python path so imports work
+    src_path = os.path.join(os.path.dirname(__file__), "src")
+    if src_path not in sys.path:
+        sys.path.insert(0, src_path)
+    
     # Check if running frozen
     if getattr(sys, 'frozen', False):
         # In frozen mode, src/ui.py should be in _MEIPASS/src/ui.py
