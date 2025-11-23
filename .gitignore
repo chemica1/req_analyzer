@@ -1,0 +1,17 @@
+# Ignore virtual environments
+venv/
+venv_build/
+__pycache__/
+*.pyc
+
+# Ignore build artifacts
+build/
+dist/
+*.spec
+
+# Do NOT ignore these for offline build
+!packages/
+!model_cache/
+
+# But ignore torch (too large for GitHub)
+packages/torch-*.whl

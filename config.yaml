@@ -1,0 +1,2 @@
+ollama_model: "llama3.1"
+embedding_model: "all-MiniLM-L6-v2"
