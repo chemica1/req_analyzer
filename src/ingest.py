@@ -22,6 +22,38 @@ def get_resource_path(relative_path):
 
     return os.path.join(base_path, relative_path)
 
+def get_indexed_files(persist_directory: str) -> set:
+    """Get list of source files already in the vector database."""
+    if not os.path.exists(persist_directory):
+        return set()
+    
+    try:
+        # Initialize embedding function
+        model_path = os.path.join(os.getcwd(), "model_cache")
+        if getattr(sys, 'frozen', False):
+            model_path = get_resource_path("model_cache")
+        
+        embedding_function = SentenceTransformerEmbeddings(
+            model_name=MODEL_NAME,
+            cache_folder=model_path
+        )
+        
+        db = Chroma(
+            persist_directory=persist_directory,
+            embedding_function=embedding_function
+        )
+        
+        # Get all documents and extract unique sources
+        # Note: This might be slow for very large DBs, but fine for this scale
+        result = db.get()
+        if result and 'metadatas' in result:
+            sources = {m.get('source') for m in result['metadatas'] if m and 'source' in m}
+            return sources
+        return set()
+    except Exception as e:
+        print(f"Error checking indexed files: {e}")
+        return set()
+
 def load_documents(data_folder: str, progress_callback=None):
     """Load PDFs and analyze them using vision model for richer extraction.
     
@@ -60,10 +92,22 @@ def load_documents(data_folder: str, progress_callback=None):
         return []
 
     # Get list of PDF files first to calculate total pages
-    pdf_files = [f for f in os.listdir(data_folder) if f.endswith(".pdf")]
+    all_pdf_files = [f for f in os.listdir(data_folder) if f.endswith(".pdf")]
+    
+    if not all_pdf_files:
+        return []
+
+    # Filter out already indexed files
+    indexed_files = get_indexed_files(CHROMA_PATH)
+    pdf_files = [f for f in all_pdf_files if f not in indexed_files]
     
     if not pdf_files:
+        print("All files are already indexed.")
+        if progress_callback:
+            progress_callback(100, 100, "All files are already indexed.")
         return []
+    
+    print(f"Found {len(pdf_files)} new files to index out of {len(all_pdf_files)} total.")
     
     # Initialize vision model
     llm = ChatOllama(model=vision_model)
@@ -78,7 +122,7 @@ def load_documents(data_folder: str, progress_callback=None):
     for filename in pdf_files:
         file_path = os.path.join(data_folder, filename)
         try:
-            images = convert_from_path(file_path, dpi=100)  # Reduced from 150 to save memory
+            images = convert_from_path(file_path, dpi=300)
             file_page_counts[filename] = len(images)
             total_pages += len(images)
         except Exception as e:
@@ -94,9 +138,10 @@ def load_documents(data_folder: str, progress_callback=None):
             progress_callback(current_page, total_pages, f"Processing {filename}...")
         
         try:
+
             # Convert PDF pages to images
             print(f"  Converting PDF to images...")
-            images = convert_from_path(file_path, dpi=100)  # Reduced from 150 to save memory
+            images = convert_from_path(file_path, dpi=300)  # Increased to 300 for high quality
             
             # Process each page with vision model
             for page_num, image in enumerate(images, start=1):
@@ -109,26 +154,18 @@ def load_documents(data_folder: str, progress_callback=None):
                         f"Analyzing {filename} - Page {page_num}/{len(images)}"
                     )
                 
-                # Resize image if too large to prevent memory issues
-                max_dimension = 1200
-                if image.width > max_dimension or image.height > max_dimension:
-                    ratio = min(max_dimension / image.width, max_dimension / image.height)
-                    new_size = (int(image.width * ratio), int(image.height * ratio))
-                    image = image.resize(new_size, Image.LANCZOS)
-                    print(f"    Resized image to {new_size}")
-                
                 # Try with PNG first, then JPEG with compression if it fails
                 for attempt in range(2):
                     try:
                         # Convert PIL Image to base64
                         buffered = io.BytesIO()
                         if attempt == 0:
-                            # First attempt: PNG
+                            # First attempt: PNG (High Quality)
                             image.save(buffered, format="PNG")
                         else:
-                            # Second attempt: JPEG with compression (smaller file)
+                            # Second attempt: JPEG with compression (fallback)
                             print(f"    Retrying with compressed JPEG...")
-                            image.save(buffered, format="JPEG", quality=70)
+                            image.save(buffered, format="JPEG", quality=85) # Increased quality for fallback too
                         
                         img_base64 = base64.b64encode(buffered.getvalue()).decode()
                         
@@ -289,9 +326,9 @@ def split_text(documents: List):
     return chunks
 
 def save_to_chroma(chunks: List, persist_directory: str):
-    # Clear out the database first to avoid duplicates in this simple implementation
-    if os.path.exists(persist_directory):
-        shutil.rmtree(persist_directory)
+    # Incremental update: Do NOT clear out the database
+    if not os.path.exists(persist_directory):
+        os.makedirs(persist_directory)
 
     # Initialize embedding function
     # We use a local cache folder for the model to ensure it can be bundled

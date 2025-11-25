@@ -99,6 +99,29 @@ def query_rag(query_text: str, ollama_model: str = CHAT_MODEL):
     
     return response_text, sources, context_text
 
+def get_all_documents():
+    """Retrieve all documents from the vector database for inspection."""
+    try:
+        embedding_function = get_embedding_function()
+        db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embedding_function)
+        
+        results = db.get()
+        
+        docs = []
+        if results and 'documents' in results:
+            for i, content in enumerate(results['documents']):
+                metadata = results['metadatas'][i] if results['metadatas'] else {}
+                docs.append({
+                    "content": content,
+                    "source": metadata.get("source", "Unknown"),
+                    "page": metadata.get("page", "N/A"),
+                    "total_pages": metadata.get("total_pages", "N/A")
+                })
+        return docs
+    except Exception as e:
+        print(f"Error fetching documents: {e}")
+        return []
+
 if __name__ == "__main__":
     # Test
     print(query_rag("What is this document about?"))

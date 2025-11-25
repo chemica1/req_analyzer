@@ -25,6 +25,14 @@ if __name__ == "__main__":
     else:
         app_path = os.path.join(os.path.dirname(__file__), "src", "ui.py")
 
+    # Start background watcher agent
+    try:
+        from watcher import start_watcher
+        print("Starting background watcher agent...")
+        start_watcher()
+    except Exception as e:
+        print(f"Failed to start watcher: {e}")
+
     sys.argv = [
         "streamlit",
         "run",

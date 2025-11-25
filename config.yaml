@@ -5,4 +5,12 @@ vision_model: "qwen3-vl:4b"
 chat_model: "llama3.2:3b"
 
 # Embedding model for vector search
+# Embedding model for vector search
 embedding_model: "all-MiniLM-L6-v2"
+
+# Background Agent Schedule
+agent_schedule:
+  enabled: true
+  start_time: "09:00"  # 24-hour format
+  end_time: "18:00"
+  check_interval_seconds: 60
