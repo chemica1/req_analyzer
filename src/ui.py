@@ -1,9 +1,8 @@
 import streamlit as st
 import os
 import sys
-import pandas as pd
 from ingest import ingest
-from rag import query_rag, get_all_documents
+from rag import query_rag
 
 st.set_page_config(page_title="Agentic AI Requirement Analyst", layout="wide")
 
@@ -97,111 +96,39 @@ with st.sidebar:
     st.divider()
     st.caption("Powered by Ollama (Llama 3.2 & Qwen 2.5 VL)")
 
-# Main Content Tabs
-tab1, tab2 = st.tabs(["💬 Chat", "🔍 Database Explorer"])
+# Chat Interface
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-with tab1:
-    # Chat Interface
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+        if "sources" in message:
+            with st.expander("View Sources"):
+                for source in message["sources"]:
+                    st.write(f"- {source}")
 
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-            if "sources" in message:
+if prompt := st.chat_input("Ask a question about requirements (e.g., 'Does KT require SMS over IMS?')"):
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    with st.chat_message("assistant"):
+        with st.spinner("Thinking..."):
+            try:
+                response_msg, sources, context = query_rag(prompt)
+                response_content = response_msg.content if hasattr(response_msg, 'content') else str(response_msg)
+                
+                st.markdown(response_content)
                 with st.expander("View Sources"):
-                    for source in message["sources"]:
+                    unique_sources = list(set(sources))
+                    for source in unique_sources:
                         st.write(f"- {source}")
-
-    if prompt := st.chat_input("Ask a question about requirements (e.g., 'Does KT require SMS over IMS?')"):
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
-
-        with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
-                try:
-                    response_msg, sources, context = query_rag(prompt)
-                    response_content = response_msg.content if hasattr(response_msg, 'content') else str(response_msg)
-                    
-                    st.markdown(response_content)
-                    with st.expander("View Sources"):
-                        unique_sources = list(set(sources))
-                        for source in unique_sources:
-                            st.write(f"- {source}")
-                    
-                    st.session_state.messages.append({
-                        "role": "assistant", 
-                        "content": response_content,
-                        "sources": unique_sources
-                    })
-                except Exception as e:
-                    st.error(f"An error occurred: {e}")
-
-with tab2:
-    st.header("Database Explorer")
-    st.caption("View all embedded chunks stored in ChromaDB")
-    
-    # Fetch all documents
-    with st.spinner("Loading database contents..."):
-        all_docs = get_all_documents()
-    
-    if not all_docs:
-        st.warning("No documents found in the database. Upload and sync PDFs to get started.")
-    else:
-        # Statistics
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Total Chunks", len(all_docs))
-        with col2:
-            unique_sources = len(set(doc["source"] for doc in all_docs))
-            st.metric("Unique Documents", unique_sources)
-        with col3:
-            total_chars = sum(len(doc["content"]) for doc in all_docs)
-            st.metric("Total Characters", f"{total_chars:,}")
-        
-        st.divider()
-        
-        # Filter by source
-        all_sources = sorted(set(doc["source"] for doc in all_docs))
-        selected_source = st.selectbox(
-            "Filter by document:",
-            ["All"] + all_sources,
-            index=0
-        )
-        
-        # Filter documents
-        if selected_source != "All":
-            filtered_docs = [doc for doc in all_docs if doc["source"] == selected_source]
-        else:
-            filtered_docs = all_docs
-        
-        st.caption(f"Showing {len(filtered_docs)} chunk(s)")
-        
-        # Display as table
-        df = pd.DataFrame(filtered_docs)
-        df['preview'] = df['content'].str[:100] + '...'
-        display_df = df[['source', 'page', 'preview']].copy()
-        display_df.columns = ['Source File', 'Page', 'Content Preview']
-        
-        st.dataframe(display_df, use_container_width=True, hide_index=True)
-        
-        # Detail view
-        st.subheader("Chunk Details")
-        chunk_index = st.number_input(
-            "Select chunk index to view full content:",
-            min_value=0,
-            max_value=len(filtered_docs) - 1 if filtered_docs else 0,
-            value=0,
-            step=1
-        )
-        
-        if filtered_docs:
-            selected_chunk = filtered_docs[chunk_index]
-            with st.expander(f"📄 {selected_chunk['source']} - Page {selected_chunk['page']}", expanded=True):
-                st.text_area(
-                    "Full Content:",
-                    selected_chunk['content'],
-                    height=300,
-                    disabled=True
-                )
+                
+                st.session_state.messages.append({
+                    "role": "assistant", 
+                    "content": response_content,
+                    "sources": unique_sources
+                })
+            except Exception as e:
+                st.error(f"An error occurred: {e}")
