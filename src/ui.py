@@ -12,7 +12,7 @@ st.markdown("Ask questions about cellular certification requirements based on th
 # Sidebar for configuration
 # Sidebar for configuration
 with st.sidebar:
-    st.header("🤖 Agent Status")
+    st.header("Agent Status")
     
     # Background Agent Status
     status_placeholder = st.empty()
@@ -26,7 +26,7 @@ with st.sidebar:
         status_placeholder.warning("Status: Unknown (Agent not started)")
         
     # Sync Button (Triggers incremental ingest)
-    if st.button("� Sync Documents Now", use_container_width=True):
+    if st.button("Sync Documents Now", use_container_width=True):
         with st.spinner("Syncing documents..."):
             try:
                 # Run incremental ingest
@@ -41,7 +41,7 @@ with st.sidebar:
 
     st.divider()
     
-    st.header("� Document Management")
+    st.header("Document Management")
     
     # PDF Upload Section
     uploaded_files = st.file_uploader(
@@ -52,7 +52,7 @@ with st.sidebar:
     )
     
     if uploaded_files:
-        if st.button("💾 Save & Process", use_container_width=True):
+        if st.button("Save & Process", use_container_width=True):
             with st.spinner("Saving files..."):
                 saved_files = []
                 if not os.path.exists("data"):
