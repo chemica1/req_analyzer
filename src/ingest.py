@@ -1,26 +1,11 @@
 import os
 import sys
-import shutil
 from typing import List
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
-from langchain_community.embeddings import SentenceTransformerEmbeddings
+from common import CHROMA_PATH, DATA_PATH, get_resource_path, get_embedding_function, load_config
 
-# Constants
-CHROMA_PATH = "chroma_db"
-DATA_PATH = "data"
-MODEL_NAME = "all-MiniLM-L6-v2"
-
-def get_resource_path(relative_path):
-    """ Get absolute path to resource, works for dev and for PyInstaller """
-    try:
-        # PyInstaller creates a temp folder and stores path in _MEIPASS
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.abspath(".")
-
-    return os.path.join(base_path, relative_path)
 
 def get_indexed_files(persist_directory: str) -> set:
     """Get list of source files already in the vector database."""
@@ -28,23 +13,13 @@ def get_indexed_files(persist_directory: str) -> set:
         return set()
     
     try:
-        # Initialize embedding function
-        model_path = os.path.join(os.getcwd(), "model_cache")
-        if getattr(sys, 'frozen', False):
-            model_path = get_resource_path("model_cache")
-        
-        embedding_function = SentenceTransformerEmbeddings(
-            model_name=MODEL_NAME,
-            cache_folder=model_path
-        )
-        
+        embedding_function = get_embedding_function()
         db = Chroma(
             persist_directory=persist_directory,
             embedding_function=embedding_function
         )
         
         # Get all documents and extract unique sources
-        # Note: This might be slow for very large DBs, but fine for this scale
         result = db.get()
         if result and 'metadatas' in result:
             sources = {m.get('source') for m in result['metadatas'] if m and 'source' in m}
@@ -326,27 +301,15 @@ def split_text(documents: List):
     return chunks
 
 def save_to_chroma(chunks: List, persist_directory: str):
+    """Save chunks to ChromaDB with incremental updates."""
     # Incremental update: Do NOT clear out the database
     if not os.path.exists(persist_directory):
         os.makedirs(persist_directory)
 
-    # Initialize embedding function
-    # We use a local cache folder for the model to ensure it can be bundled
-    model_path = os.path.join(os.getcwd(), "model_cache")
-    
-    # If running in frozen mode (PyInstaller), the model should be in _MEIPASS/model_cache
-    if getattr(sys, 'frozen', False):
-        model_path = get_resource_path("model_cache")
-        print(f"Running in frozen mode. Loading model from {model_path}")
-    else:
-        print(f"Running in dev mode. Model cache at {model_path}")
+    # Use common embedding function
+    embedding_function = get_embedding_function()
 
-    embedding_function = SentenceTransformerEmbeddings(
-        model_name=MODEL_NAME,
-        cache_folder=model_path
-    )
-
-    # Create a new DB from the documents.
+    # Create or update DB from documents
     db = Chroma.from_documents(
         documents=chunks, 
         embedding=embedding_function, 

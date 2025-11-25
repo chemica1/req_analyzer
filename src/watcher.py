@@ -1,20 +1,10 @@
-import os
 import time
-import yaml
 import datetime
 import threading
 from ingest import ingest
+from common import load_config, update_agent_status
 
-# Status file path
-STATUS_FILE = ".agent_status"
 
-def update_status(status):
-    """Update the agent status file."""
-    try:
-        with open(STATUS_FILE, "w") as f:
-            f.write(status)
-    except Exception as e:
-        print(f"Error updating status: {e}")
 
 def is_within_schedule(config):
     """Check if current time is within the scheduled active hours."""
@@ -41,15 +31,7 @@ def is_within_schedule(config):
         print(f"Invalid time format in config: {start_str} or {end_str}")
         return True
 
-def load_config():
-    config_path = os.path.join(os.getcwd(), "config.yaml")
-    if os.path.exists(config_path):
-        try:
-            with open(config_path, 'r') as f:
-                return yaml.safe_load(f)
-        except Exception as e:
-            print(f"Error loading config: {e}")
-    return {}
+
 
 def watcher_loop():
     """Main loop for the background watcher."""
@@ -61,18 +43,18 @@ def watcher_loop():
         interval = schedule.get('check_interval_seconds', 60)
         
         if is_within_schedule(config):
-            update_status("Active: Checking for new files...")
+            update_agent_status("Active: Checking for new files...")
             try:
                 # Run ingestion (it will only process new files due to incremental logic)
                 # We pass a dummy callback or None since we don't need UI progress here
                 # Or we could write progress to a file if needed
                 ingest(progress_callback=None)
-                update_status("Active: Idle (Waiting for next check)")
+                update_agent_status("Active: Idle (Waiting for next check)")
             except Exception as e:
                 print(f"Error in watcher: {e}")
-                update_status(f"Error: {str(e)}")
+                update_agent_status(f"Error: {str(e)}")
         else:
-            update_status("Sleeping (Outside scheduled hours)")
+            update_agent_status("Sleeping (Outside scheduled hours)")
         
         time.sleep(interval)
 
